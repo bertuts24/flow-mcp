@@ -85,6 +85,15 @@ async function closeAgentSettings(page: Page): Promise<void> {
   }
 }
 
+// Flow's agent-first layout (seen 2026-11-08) opens a project with the agent's session panel showing, which hides the
+// Agent toggle and the composer's Settings trigger. Closing the panel brings both back (GitHub issues 3, 18, 24).
+async function closeAgentPanel(page: Page): Promise<void> {
+  const close = page.locator("flow-agent-panel").getByRole("button", { name: "Close", exact: true });
+  if (!(await close.isVisible().catch(() => false))) return;
+  await close.click({ timeout: 5000 }).catch(() => {});
+  await agentToggle(page).waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
+}
+
 // The balance only shows inside the account panel. That panel also holds "Sign out": never touch anything else in it.
 async function readCredits(page: Page): Promise<number | undefined> {
   await dismissOverlays(page);
@@ -587,6 +596,9 @@ async function useOwnDownloadDir(page: Page): Promise<void> {
 
 // Chrome's own Downloads folder, where files land whenever the override above has been reset out from under us.
 const SYSTEM_DOWNLOADS = join(homedir(), "Downloads");
+// From ~/Downloads only media Flow could have sent counts, and it is copied, never moved, so anything else the user
+// downloads there during a generation stays where it is (GitHub issue 28).
+const FLOW_MEDIA = /\.(mp4|webm|mov|png|jpe?g|webp|gif|zip)$/i;
 
 // Everything already sitting in either folder, so a new arrival can be told apart from what was there before.
 function downloadsNow(): Set<string> {
@@ -609,12 +621,18 @@ async function waitForDownloadedFile(page: Page, before: Set<string>, timeoutMs:
       if (!existsSync(dir)) continue;
       for (const f of readdirSync(dir)) {
         if (before.has(`${dir}/${f}`) || f.endsWith(".crdownload") || f.startsWith(".")) continue;
+        if (dir === SYSTEM_DOWNLOADS && !FLOW_MEDIA.test(f)) continue;
         candidates.push(join(dir, f));
       }
     }
     for (const path of candidates) {
       const size = statSync(path).size;
-      if (stable?.path === path && stable.size === size && size > 0) return path;
+      if (stable?.path === path && stable.size === size && size > 0) {
+        if (!path.startsWith(join(SYSTEM_DOWNLOADS, "/"))) return path;
+        const copy = join(DOWNLOAD_DIR, `from-downloads-${Date.now()}`);
+        copyFileSync(path, copy);
+        return copy;
+      }
       stable = { path, size };
     }
   }
@@ -1137,8 +1155,7 @@ export async function runGeneration(job: Job): Promise<string[]> {
   const s = job.params;
 
   await ensureProjectGrid(page);
-  const agent = agentToggle(page);
-  if ((await agent.getAttribute("aria-pressed")) === "true") await agent.click();
+  await setAgentMode(page, false);
   const clear = page.getByRole("button", { name: "Clear prompt" });
   if (await clear.isVisible().catch(() => false)) await clear.click();
 
@@ -1687,6 +1704,7 @@ async function setAgentMode(page: Page, on: boolean): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     await clearBackdrops(page);
     await closeAgentSettings(page);
+    await closeAgentPanel(page);
     if (((await agent.getAttribute("aria-pressed").catch(() => null)) === "true") === on) return;
     await agent.click({ timeout: 8000 }).catch((err: Error) => {
       const lines = err.message.split("\n").map((l) => l.trim());

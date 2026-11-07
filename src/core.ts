@@ -16,7 +16,8 @@ import { TECHNIQUES, techniqueById } from "./techniques.js";
 export const OUTPUT_ROOT = process.env.FLOW_MCP_OUTPUT ?? join(homedir(), "flow-mcp-out");
 const words = (s: string) => s.split(/[^a-z0-9]+/i).filter((w) => w.length > 3).map((w) => w.toLowerCase());
 
-export const projectDir = (project: string) => resolve(OUTPUT_ROOT, project.replace(/[^\w.-]+/g, "_"));
+// Leading dots become "_" so ".." or "." can never resolve outside the films folder (GitHub issue 28).
+export const projectDir = (project: string) => resolve(OUTPUT_ROOT, project.replace(/[^\w.-]+/g, "_").replace(/^\.+/, "_"));
 
 const sceneSchema = z.object({
   prompt: z.string().min(1).describe("Full English prompt for one clip: action, shot and camera move, location, style, light, sound."),
