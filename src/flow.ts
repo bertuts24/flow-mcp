@@ -49,10 +49,32 @@ async function dismissOverlays(page: Page): Promise<void> {
   await clearBackdrops(page);
 }
 
+// Flow's "what's new" dialog (seen 2026-11-26 on a new project) covers the whole page, ignores Escape and a backdrop
+// click, and keeps "Get started" disabled until its slides (an iframe) have been stepped through with Next. Left open,
+// every job failed waiting for "Settings trigger". New accounts get it too.
+async function closeChangeLog(page: Page): Promise<void> {
+  const modal = page.locator("flow-change-log-modal");
+  if (!(await modal.count().catch(() => 0))) return;
+  const done = modal.getByRole("button", { name: "Get started" });
+  const frame = page.frameLocator("iframe.change-log-modal-iframe");
+  for (let i = 0; i < 10 && (await modal.count().catch(() => 0)); i++) {
+    if (await done.isEnabled().catch(() => false)) {
+      await done.click({ timeout: 5000 }).catch(() => {});
+      await pause(page, 1000);
+      continue;
+    }
+    const next = frame.getByRole("button").last();
+    if (await next.count().catch(() => 0)) await next.click({ timeout: 4000 }).catch(() => {});
+    else await frame.locator('[aria-label="Next"]').first().click({ timeout: 4000 }).catch(() => {});
+    await pause(page, 800);
+  }
+}
+
 // Some of Flow's menus ignore Escape (the agent's model menu did, 2026-10-13), and the invisible backdrop behind an
 // open menu ("cdk-overlay-backdrop settings-menu-backdrop") then swallows every click on the page: that is how an agent
 // batch failed with "Could not switch Agent mode on". Clicking the backdrop is how such a menu closes, picking nothing.
 async function clearBackdrops(page: Page): Promise<void> {
+  await closeChangeLog(page);
   const showing = page.locator(".cdk-overlay-backdrop.cdk-overlay-backdrop-showing");
   for (let i = 0; i < 4 && (await showing.count().catch(() => 0)); i++) {
     await showing.last().click({ force: true, timeout: 4000 }).catch(() => {});

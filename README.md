@@ -1,5 +1,17 @@
 # flow-mcp
 
+> **This is a fork** of [GTAI-1/flow-mcp](https://github.com/GTAI-1/flow-mcp), kept by Lumpong Automated for our
+> tutorial viewers. All credit for the tool goes to the original author. It is the original at its 2026-11-21 version
+> plus four small fixes:
+>
+> 1. Flow's "what's new" pop-up is closed automatically. Left open, it blocked every generation on a new project.
+> 2. The Flow Agent side panel is closed before a generation, so the composer's buttons can be reached.
+> 3. Files in your own `Downloads` folder are copied, never moved, and only media files are picked up.
+> 4. A project name can never point outside the output folder.
+>
+> Tested on Windows 11 on 2026-11-26 (image and character generation). Google changes Flow often, so it can break
+> again. If it does, check the original repo for a newer version.
+
 Drive **Google Flow** (flow.google.com) from Claude, Codex or any other MCP app, or from a local control
 panel, using Flow's own credits (free with any Google account: 50 a day), not the pay-per-use video API.
 
@@ -37,7 +49,7 @@ headless or asleep mid-run.
 ## Install
 
 ```bash
-git clone https://github.com/GTAI-1/flow-mcp.git
+git clone https://github.com/bertuts24/flow-mcp.git
 cd flow-mcp
 npm install
 npm run build
